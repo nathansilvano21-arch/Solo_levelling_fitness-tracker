@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Shed Raid: Solo Leveling</title>
+    <style>
+        :root { --gold: #ffd700; --blue: #00d4ff; --bg: #0b0b0d; --card: #16161a; --green: #30d158; --rank-color: #444; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 20px 15px 160px 15px; -webkit-tap-highlight-color: transparent; }
+        
+        /* Dynamic Rank Glow */
+        .hud { 
+            background: linear-gradient(145deg, #1c1c22, #000); 
+            padding: 20px; border-radius: 20px; 
+            border: 2px solid var(--rank-color); 
+            margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; 
+            box-shadow: 0 0 15px var(--rank-color);
+            transition: all 0.5s ease;
+        }
+
+        .player-name { font-size: 22px; font-weight: 900; letter-spacing: 2px; color: var(--blue); border: none; background: transparent; width: 100%; outline: none; text-transform: uppercase; }
+        .rank-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .rank { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; }
+        .spec-tag { font-size: 10px; background: #333; color: var(--gold); padding: 2px 8px; border-radius: 4px; font-weight: bold; border: 1px solid var(--gold); }
+        
+        .lvl-text { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; font-weight: bold;}
+        .xp-bar-bg { background: #333; height: 10px; border-radius: 5px; overflow: hidden; }
+        #xp-bar-fill { background: linear-gradient(90deg, var(--blue), var(--gold)); height: 100%; width: 0%; transition: 1s ease-out; }
+
+        /* Daily Quest & Rest Mode */
+        .daily-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,212,255,0.1); padding: 10px; border-radius: 10px; margin-top: 10px; border: 1px solid rgba(0,212,255,0.3); }
+        .mode-toggle { font-size: 10px; background: #222; border: 1px solid #444; color: #888; padding: 5px 10px; border-radius: 20px; font-weight: bold; }
+        .mode-toggle.active { background: var(--blue); color: #000; border-color: #fff; }
+
+        .stats-row { display: flex; justify-content: space-around; margin-top: 15px; border-top: 1px solid #333; padding-top: 15px; }
+        .stat-val { font-size: 16px; font-weight: bold; color: var(--gold); }
+        .stat-label { font-size: 9px; color: #888; text-transform: uppercase; }
+
+        /* Content */
+        .day { background: var(--card); border-radius: 16px; padding: 18px; margin-bottom: 20px; border: 1px solid #222; }
+        h2 { color: var(--blue); font-size: 13px; text-transform: uppercase; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        .row { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 10px; border-radius: 10px; margin-bottom: 8px; }
+        .task-name { font-size: 14px; font-weight: bold; }
+        .task-vol { font-size: 10px; color: var(--gold); text-transform: uppercase; }
+        
+        input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--blue); margin-right: 10px; }
+        .small-box { width: 55px; background: #333; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 6px; text-align: center; font-size: 12px; }
+        
+        .quest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+        .water-btn { background: #1e293b; border: 1px solid var(--blue); color: var(--blue); padding: 10px; border-radius: 8px; font-size: 11px; text-align: center; font-weight: bold; }
+        .water-btn.active { background: var(--blue); color: #000; }
+
+        /* History Log */
+        .history-log { background: #000; padding: 15px; border-radius: 15px; margin-top: 20px; border: 1px solid #222; }
+        .history-item { font-size: 11px; border-bottom: 1px solid #222; padding: 8px 0; display: flex; justify-content: space-between; color: #aaa; }
+        
+        .reset-btn { position: fixed; bottom: 20px; left: 20px; right: 20px; background: #fff; color: #000; border: none; padding: 20px; border-radius: 16px; font-weight: 900; z-index: 1001; text-transform: uppercase; }
+        select { width: 100%; background: #222; color: var(--gold); border: 1px solid var(--gold); padding: 14px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="hud" id="main-hud">
+    <input type="text" id="player-name-input" class="player-name" placeholder="HUNTER NAME" oninput="saveName(this.value)">
+    <div class="rank-row">
+        <div id="rank-display" class="rank">RANK: E-RANK</div>
+        <div id="spec-display" class="spec-tag">THE ASPIRANT</div>
+    </div>
+    
+    <div class="lvl-container">
+        <div class="lvl-text"><span>LVL <span id="current-lvl">1</span></span><span id="xp-ratio">0 XP</span></div>
+        <div class="xp-bar-bg"><div id="xp-bar-fill"></div></div>
+    </div>
+
+    <div class="daily-row">
+        <div style="display:flex; align-items:center; font-size:12px; font-weight:bold;">
+            <input type="checkbox" id="daily-duty" onchange="calculateXP()"> Daily Duty Bonus
+        </div>
+        <button id="rest-mode-btn" class="mode-toggle" onclick="toggleRestMode()">Raid Active</button>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-box"><div class="stat-label">STR</div><div id="stat-str" class="stat-val">0</div></div>
+        <div class="stat-box"><div class="stat-label">Cycle</div><div id="stat-cycle" class="stat-val">0</div></div>
+        <div class="stat-box"><div class="stat-label">Total XP</div><div id="stat-total" class="stat-val">0</div></div>
+    </div>
+</div>
+
+<select id="week-focus" onchange="updateFocus(this.value)">
+    <option value="none">-- Select Raid Specialization --</option>
+    <option value="arms">Arms Specialization</option>
+    <option value="chest">Chest Specialization</option>
+    <option value="back">Back Specialization</option>
+    <option value="shoulders">Shoulder Specialization</option>
+</select>
+
+<div id="content"></div>
+
+<div class="history-log">
+    <h3 style="font-size: 10px; color: #444; text-transform: uppercase; margin-top: 0;">Raid History (Last 5)</h3>
+    <div id="history-list"></div>
+</div>
+
+<div style="margin-top:20px; display:flex; gap:10px;">
+    <button class="water-btn" style="flex:1" onclick="exportSave()">Backup ID</button>
+    <button class="water-btn" style="flex:1" onclick="importSave()">Restore ID</button>
+</div>
+
+<button class="reset-btn" onclick="resetWeek()">Bank Cycle & Rank Up</button>
+
+<script>
+    const library = {
+        arms: [[{n:"Bike Cardio",v:"Mins / KM"},{n:"BB Curls",v:"3x10"},{n:"Close Bench",v:"3x8"},{n:"Goblet Squat",v:"3x12"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"DB Hammer Curls",v:"3x12"},{n:"Bench Dips",v:"3xMax"},{n:"Plank",v:"1m"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Zottman Curls",v:"3x12"},{n:"Skullcrushers",v:"3x10"},{n:"DB Deadlift",v:"3x10"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Concentration Curls",v:"3x10"},{n:"DB Kickbacks",v:"3x12"},{n:"Leg Raises",v:"3x15"}]],
+        chest: [[{n:"Bike Cardio",v:"Mins / KM"},{n:"BB Bench",v:"3x8"},{n:"Svend Press",v:"3x15"},{n:"Goblet Squat",v:"3x12"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Incline DB Press",v:"3x10"},{n:"Pushups",v:"3xMax"},{n:"DB Deadlift",v:"3x10"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Close Grip Bench",v:"3x10"},{n:"Floor Press",v:"3x12"},{n:"Plank",v:"1m"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Pause Bench",v:"3x8"},{n:"Incline Pushups",v:"3xMax"},{n:"Leg Raises",v:"3x15"}]],
+        back: [[{n:"Bike Cardio",v:"Mins / KM"},{n:"BB Bent Row",v:"3x8"},{n:"BB Shrugs",v:"3x12"},{n:"Goblet Squat",v:"3x12"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"DB Deadlift",v:"3x10"},{n:"Single Arm Row",v:"3x10"},{n:"Plank",v:"1m"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Romanian Deadlift",v:"3x10"},{n:"Reverse Flyes",v:"3x15"},{n:"Leg Raises",v:"3x15"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Upright Row",v:"3x10"},{n:"DB Shrugs",v:"3x15"},{n:"Goblet Squat",v:"3x12"}]],
+        shoulders: [[{n:"Bike Cardio",v:"Mins / KM"},{n:"Seated BB OHP",v:"3x8"},{n:"Lateral Raise",v:"3x12"},{n:"Goblet Squat",v:"3x12"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Seated Arnold",v:"3x10"},{n:"Front Raise",v:"3x12"},{n:"DB Deadlift",v:"3x10"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Rear Delt Flyes",v:"3x15"},{n:"Face Pulls",v:"3x15"},{n:"Plank",v:"1m"}],[{n:"Bike Cardio",v:"Mins / KM"},{n:"Seated DB Press",v:"3x10"},{n:"High Pulls",v:"3x12"},{n:"Leg Raises",v:"3x15"}]]
+    };
+
+    const sessions = [{id:0, label:"Session 1: Power", type:"gym", idx:0},{id:1, label:"Session 2: Volume", type:"gym", idx:1},{id:2, label:"Session 3: Recovery Path", type:"walk"},{id:3, label:"Session 4: Hypertrophy", type:"gym", idx:2},{id:4, label:"Session 5: The Grind", type:"gym", idx:3},{id:5, label:"Session 6: Endurance Path", type:"walk"},{id:6, label:"Session 7: Final Stretch", type:"walk"}];
+
+    function saveName(v) { localStorage.setItem('playerName', v); }
+    function toggleRestMode() {
+        let mode = localStorage.getItem('restMode') === 'true';
+        localStorage.setItem('restMode', !mode);
+        render();
+    }
+
+    function updateFocus(v) { localStorage.setItem('focus', v); render(); }
+
+    function render() {
+        const focus = localStorage.getItem('focus') || 'none';
+        const rest = localStorage.getItem('restMode') === 'true';
+        document.getElementById('player-name-input').value = localStorage.getItem('playerName') || 'HUNTER';
+        document.getElementById('week-focus').value = focus;
+        document.getElementById('rest-mode-btn').innerText = rest ? "Rest Mode" : "Raid Active";
+        document.getElementById('rest-mode-btn').className = rest ? "mode-toggle active" : "mode-toggle";
+        
+        let html = '';
+        sessions.forEach(sess => {
+            if (rest && sess.type === "gym") return; // Hide gym on rest mode
+            html += `<div class="day"><h2>${sess.label}</h2>`;
+            if (sess.type === "gym" && focus !== 'none') {
+                library[focus][sess.idx].forEach((task, j) => {
+                    const id = `c-${sess.id}-${j}`, kid = `k-${sess.id}-${j}`, tid = `t-${sess.id}-${j}`;
+                    const isBike = task.n.includes('Bike');
+                    html += `<div class="row">
+                        <div style="display:flex;align-items:center;">
+                            <input type="checkbox" class="cb" id="${id}" ${localStorage.getItem(id)==='true'?'checked':''}> 
+                            <div class="task-info"><span class="task-name">${task.n}</span><span class="task-vol">${task.v}</span></div>
+                        </div>
+                        <div style="display:flex; gap:5px;">
+                            ${isBike ? `<input type="text" class="iv small-box" id="${tid}" value="${localStorage.getItem(tid)||''}" placeholder="Min">` : ''}
+                            <input type="text" class="iv small-box ${isBike?'km-field':''}" id="${kid}" value="${localStorage.getItem(kid)||''}" placeholder="${isBike?'km':'kg'}">
+                        </div>
+                    </div>`;
+                });
+            } else if (sess.type === "walk") {
+                const cid = `c-${sess.id}-0`, kid = `k-${sess.id}-0`;
+                html += `<div class="row">
+                    <div style="display:flex;align-items:center;">
+                        <input type="checkbox" class="cb" id="${cid}" ${localStorage.getItem(cid)==='true'?'checked':''}> 
+                        <div class="task-info"><span class="task-name">Recovery Walk</span><span class="task-vol">Distance</span></div>
+                    </div>
+                    <input type="text" class="iv small-box km-field" id="${kid}" value="${localStorage.getItem(kid)||''}" placeholder="km">
+                </div>`;
+            }
+            const wKey = `water-${sess.id}`, waterVal = parseInt(localStorage.getItem(wKey)) || 0;
+            html += `<div class="quest-grid">
+                <div class="water-btn ${waterVal>=3?'active':''}" onclick="addWater(${sess.id})">💧 ${waterVal}/3L Water</div>
+                <div class="field"><input type="text" class="iv small-box step-field" style="width:100%" id="s-${sess.id}" value="${localStorage.getItem('s-'+sess.id)||''}" placeholder="Steps"></div>
+            </div></div>`;
+        });
+        document.getElementById('content').innerHTML = html;
+        renderHistory();
+        calculateXP();
+    }
+
+    function addWater(id) { let val = (parseInt(localStorage.getItem(`water-${id}`)) || 0) + 1; localStorage.setItem(`water-${id}`, val > 3 ? 0 : val); render(); }
+
+    function calculateXP() {
+        let weeklyXP = 0, strXP = 0;
+        document.querySelectorAll('.cb').forEach(cb => { 
+            if(cb.checked) { 
+                const kid = cb.id.replace('c-', 'k-');
+                const val = parseFloat(document.getElementById(kid)?.value) || 0;
+                if(document.getElementById(kid)?.classList.contains('km-field')) weeklyXP += val * 1.5; 
+                else strXP += (2 + (val * 0.01));
+            } 
+        });
+        document.querySelectorAll('.step-field').forEach(f => { weeklyXP += (parseInt(f.value) || 0) * 0.0005; });
+        for(let i=0; i<7; i++) { if(localStorage.getItem(`water-${i}`) >= 3) weeklyXP += 5; }
+        if(document.getElementById('daily-duty').checked) weeklyXP += 10;
+        
+        let banked = parseFloat(localStorage.getItem('lifetimeXP')) || 0;
+        let milestoneBonus = checkMilestones(banked + weeklyXP + strXP);
+        let total = banked + weeklyXP + strXP + milestoneBonus;
+        
+        // Exponential Grind Curve Logic
+        let level = (total >= 10) ? Math.floor(Math.sqrt(total / 12)) + 1 : 1;
+        const xpCurr = (level === 1) ? 0 : Math.pow(level - 1, 2) * 12, xpNext = Math.pow(level, 2) * 12;
+        
+        document.getElementById('current-lvl').innerText = level;
+        document.getElementById('xp-bar-fill').style.width = Math.min(100, ((total - xpCurr) / (xpNext - xpCurr) * 100)) + "%";
+        document.getElementById('xp-ratio').innerText = `${Math.round(total)} XP`;
+        document.getElementById('stat-str').innerText = Math.round(strXP);
+        document.getElementById('stat-total').innerText = Math.round(total);
+        document.getElementById('stat-cycle').innerText = localStorage.getItem('cycleCount') || 0;
+        
+        let rank = "E-RANK", color = "#444";
+        if(level > 10) { rank = "D-RANK"; color = "#30d158"; }
+        if(level > 30) { rank = "C-RANK"; color = "#00d4ff"; }
+        if(level > 60) { rank = "B-RANK"; color = "#af52de"; }
+        if(level > 90) { rank = "A-RANK"; color = "#ff3b30"; }
+        if(level > 120) { rank = "S-RANK"; color = "#ffd700"; }
+        
+        document.getElementById('rank-display').innerText = `RANK: ${rank}`;
+        document.getElementById('main-hud').style.setProperty('--rank-color', color);
+
+        let counts = JSON.parse(localStorage.getItem('specCounts') || '{"arms":0,"chest":0,"back":0,"shoulders":0}');
+        let cycles = parseInt(localStorage.getItem('cycleCount') || 0), max = Math.max(counts.arms, counts.chest, counts.back, counts.shoulders), title = "THE ASPIRANT";
+        if(cycles > 0) {
+            if (max === 0) title = "THE ALL-ROUNDER";
+            else if(counts.arms === max) title = "THE DUAL-WIELDER";
+            else if(counts.chest === max) title = "THE IRON BASTION";
+            else if(counts.back === max) title = "THE TITAN PILLAR";
+            else if(counts.shoulders === max) title = "THE BOULDER KING";
+        }
+        document.getElementById('spec-display').innerText = title;
+    }
+
+    function checkMilestones(total) {
+        let milestones = JSON.parse(localStorage.getItem('milestones') || '[]');
+        let bonus = 0;
+        const goals = [{id:'c1',n:'Centurion I',r:1000,xp:50},{id:'c2',n:'Centurion II',r:5000,xp:100},{id:'e1',n:'Earth Walker I',r:2500,xp:50},{id:'core1',n:'Consistent I',r:500,xp:25}];
+        goals.forEach(g => {
+            if (total >= g.r && !milestones.includes(g.id)) { milestones.push(g.id); localStorage.setItem('milestones', JSON.stringify(milestones)); }
+            if (milestones.includes(g.id)) bonus += g.xp;
+        });
+        return bonus;
+    }
+
+    function renderHistory() {
+        const hist = JSON.parse(localStorage.getItem('raidHistory') || '[]');
+        document.getElementById('history-list').innerHTML = hist.map(h => `<div class="history-item"><span>Cycle ${h.id}: ${h.spec}</span><span>${h.date}</span></div>`).join('');
+    }
+
+    function resetWeek() {
+        if(!confirm("Finish Raid and Bank XP? Current inputs will be cleared.")) return;
+        
+        let wXP = 0, sXP = 0;
+        document.querySelectorAll('.cb').forEach(cb => { 
+            if(cb.checked) { 
+                const kid = cb.id.replace('c-', 'k-');
+                const val = parseFloat(document.getElementById(kid)?.value) || 0;
+                if(document.getElementById(kid)?.classList.contains('km-field')) wXP += val * 1.5; else sXP += (2 + (val * 0.01));
+            }
+        });
+        document.querySelectorAll('.step-field').forEach(f => { wXP += (parseInt(f.value) || 0) * 0.0005; });
+        for(let i=0; i<7; i++) { if(localStorage.getItem(`water-${i}`) >= 3) wXP += 5; }
+        if(document.getElementById('daily-duty').checked) wXP += 10;
+        
+        let focus = localStorage.getItem('focus') || 'none';
+        let counts = JSON.parse(localStorage.getItem('specCounts') || '{"arms":0,"chest":0,"back":0,"shoulders":0}');
+        if(focus !== 'none') counts[focus]++;
+        localStorage.setItem('specCounts', JSON.stringify(counts));
+
+        let currentCycles = parseInt(localStorage.getItem('cycleCount') || 0) + 1;
+        localStorage.setItem('cycleCount', currentCycles);
+        
+        // Log History
+        let hist = JSON.parse(localStorage.getItem('raidHistory') || []);
+        hist.unshift({ id: currentCycles, spec: focus.toUpperCase(), date: new Date().toLocaleDateString() });
+        localStorage.setItem('raidHistory', JSON.stringify(hist.slice(0,5)));
+
+        let banked = parseFloat(localStorage.getItem('lifetimeXP')) || 0;
+        localStorage.setItem('lifetimeXP', banked + wXP + sXP);
+
+        // Clear Fields
+        sessions.forEach(sess => { for(let j=0; j<10; j++) { localStorage.removeItem(`c-${sess.id}-${j}`); localStorage.removeItem(`k-${sess.id}-${j}`); localStorage.removeItem(`t-${sess.id}-${j}`); } localStorage.removeItem(`water-${sess.id}`); localStorage.removeItem(`s-${sess.id}`); });
+        localStorage.removeItem('daily-duty');
+        location.reload();
+    }
+
+    function exportSave() { prompt("BACKUP ID:", btoa(JSON.stringify(localStorage))); }
+    function importSave() { let code = prompt("PASTE ID:"); if(code) { Object.assign(localStorage, JSON.parse(atob(code))); location.reload(); }}
+
+    document.addEventListener('input', (e) => { if(e.target.id) localStorage.setItem(e.target.id, e.target.type === 'checkbox' ? e.target.checked : e.target.value); calculateXP(); });
+    window.onload = render;
+</script>
+</body>
+</html>
