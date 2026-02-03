@@ -138,7 +138,7 @@
         
         let html = '';
         sessions.forEach(sess => {
-            if (rest && sess.type === "gym") return; // Hide gym on rest mode
+            if (rest && sess.type === "gym") return;
             html += `<div class="day"><h2>${sess.label}</h2>`;
             if (sess.type === "gym" && focus !== 'none') {
                 library[focus][sess.idx].forEach((task, j) => {
@@ -196,7 +196,6 @@
         let milestoneBonus = checkMilestones(banked + weeklyXP + strXP);
         let total = banked + weeklyXP + strXP + milestoneBonus;
         
-        // Exponential Grind Curve Logic
         let level = (total >= 10) ? Math.floor(Math.sqrt(total / 12)) + 1 : 1;
         const xpCurr = (level === 1) ? 0 : Math.pow(level - 1, 2) * 12, xpNext = Math.pow(level, 2) * 12;
         
@@ -268,16 +267,26 @@
         let currentCycles = parseInt(localStorage.getItem('cycleCount') || 0) + 1;
         localStorage.setItem('cycleCount', currentCycles);
         
-        // Log History
-        let hist = JSON.parse(localStorage.getItem('raidHistory') || []);
+        let hist = JSON.parse(localStorage.getItem('raidHistory') || '[]');
         hist.unshift({ id: currentCycles, spec: focus.toUpperCase(), date: new Date().toLocaleDateString() });
         localStorage.setItem('raidHistory', JSON.stringify(hist.slice(0,5)));
 
+        // SURGICAL FIX: Calculate weekly total and add milestone bonuses to the lifetime bank
         let banked = parseFloat(localStorage.getItem('lifetimeXP')) || 0;
-        localStorage.setItem('lifetimeXP', banked + wXP + sXP);
+        let currentWeeklyProgress = wXP + sXP;
+        let milestoneBonus = checkMilestones(banked + currentWeeklyProgress);
+        localStorage.setItem('lifetimeXP', banked + currentWeeklyProgress + milestoneBonus);
 
         // Clear Fields
-        sessions.forEach(sess => { for(let j=0; j<10; j++) { localStorage.removeItem(`c-${sess.id}-${j}`); localStorage.removeItem(`k-${sess.id}-${j}`); localStorage.removeItem(`t-${sess.id}-${j}`); } localStorage.removeItem(`water-${sess.id}`); localStorage.removeItem(`s-${sess.id}`); });
+        sessions.forEach(sess => { 
+            for(let j=0; j<10; j++) { 
+                localStorage.removeItem(`c-${sess.id}-${j}`); 
+                localStorage.removeItem(`k-${sess.id}-${j}`); 
+                localStorage.removeItem(`t-${sess.id}-${j}`); 
+            } 
+            localStorage.removeItem(`water-${sess.id}`); 
+            localStorage.removeItem(`s-${sess.id}`); 
+        });
         localStorage.removeItem('daily-duty');
         location.reload();
     }
